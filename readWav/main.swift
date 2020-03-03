@@ -6,7 +6,8 @@
 //  Copyright © 2020 flowkey. All rights reserved.
 //
 
-import Foundation
+let wavFile = try WavFile(filename: "example.wav", blockSize: 1024)
 
-print("Hello, World!")
-
+for block in wavFile {
+    print(block)
+}
