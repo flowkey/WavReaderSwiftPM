@@ -1,0 +1,4 @@
+module CWavHeader {
+    header "wavHeader.h"
+    export *
+}
