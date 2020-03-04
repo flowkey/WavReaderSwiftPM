@@ -7,8 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5C6684EF240FC3380073B658 /* WavFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C6684EE240FC3380073B658 /* WavFile.swift */; };
 		5CBB7985240EADB600388B81 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CBB7984240EADB600388B81 /* main.swift */; };
-		5CBB7992240ED35500388B81 /* WavFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CBB7991240ED35500388B81 /* WavFile.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -24,11 +24,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		5C6684EE240FC3380073B658 /* WavFile.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = WavFile.swift; path = Sources/WavFile/WavFile.swift; sourceTree = SOURCE_ROOT; };
 		5CBB7981240EADB600388B81 /* readWav */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = readWav; sourceTree = BUILT_PRODUCTS_DIR; };
 		5CBB7984240EADB600388B81 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
-		5CBB798D240EB99100388B81 /* readWav-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "readWav-Bridging-Header.h"; sourceTree = "<group>"; };
 		5CBB798E240EB99100388B81 /* wavHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = wavHeader.h; sourceTree = "<group>"; };
-		5CBB7991240ED35500388B81 /* WavFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WavFile.swift; sourceTree = "<group>"; };
 		5CBB7994240EEA0C00388B81 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -65,8 +64,7 @@
 				5CBB7994240EEA0C00388B81 /* README.md */,
 				5CBB7984240EADB600388B81 /* main.swift */,
 				5CBB798E240EB99100388B81 /* wavHeader.h */,
-				5CBB798D240EB99100388B81 /* readWav-Bridging-Header.h */,
-				5CBB7991240ED35500388B81 /* WavFile.swift */,
+				5C6684EE240FC3380073B658 /* WavFile.swift */,
 			);
 			path = readWav;
 			sourceTree = "<group>";
@@ -130,7 +128,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				5CBB7992240ED35500388B81 /* WavFile.swift in Sources */,
+				5C6684EF240FC3380073B658 /* WavFile.swift in Sources */,
 				5CBB7985240EADB600388B81 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -264,7 +262,7 @@
 					"@loader_path/../Frameworks",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_OBJC_BRIDGING_HEADER = "readWav/readWav-Bridging-Header.h";
+				SWIFT_INCLUDE_PATHS = "$(PROJECT_DIR)/Sources/CWavHeader/include";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 			};
@@ -283,7 +281,7 @@
 					"@loader_path/../Frameworks",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_OBJC_BRIDGING_HEADER = "readWav/readWav-Bridging-Header.h";
+				SWIFT_INCLUDE_PATHS = "$(PROJECT_DIR)/Sources/CWavHeader/include";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
