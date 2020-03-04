@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import CWavHeader
 
 public struct WavFile: Sequence {
     let numFrames: Int
