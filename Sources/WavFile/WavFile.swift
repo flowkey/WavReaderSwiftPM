@@ -10,6 +10,7 @@ import Foundation
 import CWavHeader
 
 public struct WavFile: Sequence {
+    let sampleRate: Int
     let numFrames: Int
     let numChannels: Int
     let bitsPerSample: Int
@@ -30,6 +31,7 @@ public struct WavFile: Sequence {
 
         print(header)
 
+        sampleRate = Int(header.sample_rate)
         numChannels = Int(header.channels)
         bitsPerSample = Int(header.bits_per_sample)
         bytesPerSample = bitsPerSample / 8
