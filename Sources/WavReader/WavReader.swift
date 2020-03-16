@@ -35,8 +35,6 @@ public struct WavReader: Sequence {
             preconditionFailure("Invalid wav header: could not find fmt section")
         }
 
-        print(fmtChunk)
-
         sampleRate = Int(fmtChunk.sampleRate)
         numChannels = Int(fmtChunk.channelCount)
         bitsPerSample = Int(fmtChunk.bitsPerSample)
