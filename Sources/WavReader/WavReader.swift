@@ -10,6 +10,7 @@ import Foundation
 import CWavHeader
 
 public struct WavReader: Sequence {
+    public let formatType: Format
     public let sampleRate: Int
     public let numFrames: Int
     public let numChannels: Int
@@ -23,16 +24,33 @@ public struct WavReader: Sequence {
     fileprivate let bytes: Data
     fileprivate let offsetToWavData: Int
 
+    public enum FormatError: Error {
+        case couldNotFindFmtSection
+        case couldNotFindDataSection
+        case unsupportedFormat(format: Int)
+    }
+
+    public enum Format {
+        case pcm
+        case ieeeFloat
+    }
+
     public init(bytes: Data, blockSize: Int = 1024) throws {
         self.blockSize = blockSize
 
         guard
-            let indexOfFormatSection = bytes.firstOccurence(of: "fmt", maxSearchBytes: 512),
+            let indexOfFormatSection = bytes.firstOccurence(of: "fmt", maxSearchBytes: 2048),
             let fmtChunk = bytes.withUnsafeBytes({ buffer -> FmtChunk? in
                 buffer.baseAddress?.advanced(by: indexOfFormatSection).bindMemory(to: FmtChunk.self, capacity: 1).pointee
             })
-            else {
-            preconditionFailure("Invalid wav header: could not find fmt section")
+        else {
+            throw FormatError.couldNotFindFmtSection
+        }
+
+        switch fmtChunk.formatType {
+        case 1: self.formatType = .pcm
+        case 3: self.formatType = .ieeeFloat
+        default: throw FormatError.unsupportedFormat(format: Int(fmtChunk.formatType))
         }
 
         sampleRate = Int(fmtChunk.sampleRate)
@@ -42,12 +60,12 @@ public struct WavReader: Sequence {
         bytesPerFrame = numChannels * bytesPerSample
 
         guard
-            let indexOfDataSection = bytes.firstOccurence(of: "data", maxSearchBytes: 512),
+            let indexOfDataSection = bytes.firstOccurence(of: "data", maxSearchBytes: 2048),
             let dataChunk = bytes.withUnsafeBytes({ buffer -> DataChunk? in
                 buffer.baseAddress?.advanced(by: indexOfDataSection).bindMemory(to: DataChunk.self, capacity: 1).pointee
             })
-            else {
-            preconditionFailure("Invalid wav header: could not find data section")
+        else {
+            throw FormatError.couldNotFindDataSection
         }
 
         numFrames = Int(dataChunk.dataSize) / bytesPerFrame
@@ -55,7 +73,6 @@ public struct WavReader: Sequence {
         offsetToWavData = indexOfDataSection + MemoryLayout<DataChunk>.size
 
         self.bytes = bytes
-        precondition(bitsPerSample == 16, "The algo currently only supports 16bit")
     }
 
     public init(filename: String = "example.wav", blockSize: Int = 1024) throws {
@@ -81,25 +98,85 @@ extension WavReader {
         }
 
         public func next() -> [Float]? {
-            let offsetToWavData = wavFile.offsetToWavData
+            switch wavFile.formatType {
+            case .pcm:
+                return getNextPcmBlock()
+            case .ieeeFloat:
+                if wavFile.bitsPerSample == 32 {
+                    return getNextFloatBlock()
+                } else {
+                    return getNextDoubleBlock()
+                }
+            }
+        }
 
+        private func getNextFloatBlock() -> [Float]? {
+            wavFile.bytes.withUnsafeBytes { bufferPointer in
+                let readBuffer = UnsafeBufferPointer(
+                    start: bufferPointer.baseAddress!.advanced(by: wavFile.offsetToWavData).assumingMemoryBound(to: Float.self),
+                    count: wavFile.numSamples
+                )
+
+                // each frame may contain multiple samples
+                let framesToRead = Swift.min(wavFile.blockSize, (wavFile.numFrames - frameIndex))
+                guard framesToRead > 0 else { return nil }
+
+                floatBuffer = readBuffer[frameIndex ..< frameIndex + (framesToRead * wavFile.numChannels)].map { return Float($0) }
+                self.frameIndex += framesToRead
+                return floatBuffer
+            }
+        }
+
+        // XXX: This is a 1:1 copy of the float reader above, but with a Double type
+        // We should be able to fix this with some kind of dynamism, but I couldn't figure it out quickly
+        private func getNextDoubleBlock() -> [Float]? {
+            wavFile.bytes.withUnsafeBytes { bufferPointer in
+                let readBuffer = UnsafeBufferPointer(
+                    start: bufferPointer.baseAddress!.advanced(by: wavFile.offsetToWavData).assumingMemoryBound(to: Double.self),
+                    count: wavFile.numSamples
+                )
+
+                // each frame may contain multiple samples
+                let framesToRead = Swift.min(wavFile.blockSize, (wavFile.numFrames - frameIndex))
+                guard framesToRead > 0 else { return nil }
+
+                floatBuffer = readBuffer[frameIndex ..< frameIndex + (framesToRead * wavFile.numChannels)].map { return Float($0) }
+                self.frameIndex += framesToRead
+                return floatBuffer
+            }
+        }
+
+        private func getNextPcmBlock() -> [Float]? {
             // it's cheaper to do multiplication than division, so divide
             // here once and multiply each sample by this number:
-            let floatFactor = Float(1.0) / Float(Int16.max)
+            let maxPossibleValue = pow(2.0, Double(wavFile.bitsPerSample) - 1) - 1
+            let floatFactor = Double(1.0) / Double(maxPossibleValue)
 
             var framesRead = 0
 
             return wavFile.bytes.withUnsafeBytes { bufferPointer in
-                let int16buffer = UnsafeBufferPointer<Int16>(
-                    start: bufferPointer.baseAddress!.advanced(by: offsetToWavData).assumingMemoryBound(to: Int16.self),
-                    count: wavFile.numSamples
+                let byteBuffer = UnsafeBufferPointer(
+                    start: bufferPointer.baseAddress!.advanced(by: wavFile.offsetToWavData).assumingMemoryBound(to: Int8.self),
+                    count: wavFile.numFrames * wavFile.bytesPerFrame
                 )
 
                 while frameIndex < wavFile.numFrames {
                     for channel in 0 ..< wavFile.numChannels {
-                        let dataArrayIndex = frameIndex + channel
-                        let sample = int16buffer[dataArrayIndex]
-                        floatBuffer[framesRead] = Float(sample) * floatFactor
+                        // frame:
+                        // [               /---- byte
+                        //   channel1: [b, b] <---- sample
+                        //   channel2: [b, b] <---- sample
+                        // ]
+                        //
+                        let baseByteArrayIndexOfSample = (frameIndex * wavFile.bytesPerFrame) + (channel * wavFile.bytesPerSample)
+
+                        var sample = 0
+                        for i in 0 ..< wavFile.bytesPerSample {
+                            sample <<= 8
+                            sample |= Int(byteBuffer[baseByteArrayIndexOfSample + i])
+                        }
+
+                        floatBuffer[framesRead] = Float(Double(sample) * floatFactor)
                     }
 
                     framesRead += 1
@@ -111,7 +188,9 @@ extension WavReader {
                 }
 
                 if framesRead > 0 {
-                    // We're at EOF
+                    // We're at EOF but we didn't return the buffer yet
+                    // That means the unwritten part of the current buffer
+                    // will contain data from the _last_ iteration
 
                     // Empty the rest of the float buffer, otherwise it
                     // will contain the previous frame's data:

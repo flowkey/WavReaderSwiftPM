@@ -7,8 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		5C6684EF240FC3380073B658 /* WavReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C6684EE240FC3380073B658 /* WavReader.swift */; };
 		5CBB7985240EADB600388B81 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CBB7984240EADB600388B81 /* main.swift */; };
+		5CE1D54624256159003CEE76 /* WavReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CE1D54524256159003CEE76 /* WavReader.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -24,12 +24,12 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		5C6684EE240FC3380073B658 /* WavReader.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = WavReader.swift; path = Sources/WavFile/WavReader.swift; sourceTree = SOURCE_ROOT; };
 		5C7F30532417D76900A121DF /* Package.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Package.swift; sourceTree = SOURCE_ROOT; };
 		5CB9839924112E17001376D5 /* wavHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = wavHeader.h; path = Sources/CWavHeader/include/wavHeader.h; sourceTree = SOURCE_ROOT; };
 		5CBB7981240EADB600388B81 /* WavReader */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = WavReader; sourceTree = BUILT_PRODUCTS_DIR; };
 		5CBB7984240EADB600388B81 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		5CBB7994240EEA0C00388B81 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = SOURCE_ROOT; };
+		5CE1D54524256159003CEE76 /* WavReader.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = WavReader.swift; path = Sources/WavReader/WavReader.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -66,7 +66,7 @@
 				5CBB7994240EEA0C00388B81 /* README.md */,
 				5CBB7984240EADB600388B81 /* main.swift */,
 				5CB9839924112E17001376D5 /* wavHeader.h */,
-				5C6684EE240FC3380073B658 /* WavReader.swift */,
+				5CE1D54524256159003CEE76 /* WavReader.swift */,
 			);
 			path = WavReader;
 			sourceTree = "<group>";
@@ -130,8 +130,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				5C6684EF240FC3380073B658 /* WavReader.swift in Sources */,
 				5CBB7985240EADB600388B81 /* main.swift in Sources */,
+				5CE1D54624256159003CEE76 /* WavReader.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
