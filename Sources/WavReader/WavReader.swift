@@ -149,16 +149,18 @@ extension WavReader {
         private func getNextPcmBlock() -> [Float]? {
             // it's cheaper to do multiplication than division, so divide
             // here once and multiply each sample by this number:
-            let maxPossibleValue = pow(2.0, Double(wavFile.bitsPerSample) - 1) - 1
+            let maxPossibleValue = pow(2.0, Double(wavFile.bitsPerSample) - 1)
             let floatFactor = Double(1.0) / Double(maxPossibleValue)
+            let bitShiftConst = (32 - wavFile.bitsPerSample)
 
             var framesRead = 0
 
             return wavFile.bytes.withUnsafeBytes { bufferPointer in
                 let byteBuffer = UnsafeBufferPointer(
-                    start: bufferPointer.baseAddress!.advanced(by: wavFile.offsetToWavData).assumingMemoryBound(to: Int8.self),
+                    start: bufferPointer.baseAddress!.advanced(by: wavFile.offsetToWavData).assumingMemoryBound(to: UInt8.self),
                     count: wavFile.numFrames * wavFile.bytesPerFrame
                 )
+
 
                 while frameIndex < wavFile.numFrames {
                     for channel in 0 ..< wavFile.numChannels {
@@ -170,13 +172,27 @@ extension WavReader {
                         //
                         let baseByteArrayIndexOfSample = (frameIndex * wavFile.bytesPerFrame) + (channel * wavFile.bytesPerSample)
 
-                        var sample = 0
+                        // piece together some bytes starting from the left (bigEndian puts the incoming byte on the far left)
+                        // Example for three bytes (24bit PCM):
+                        // 1010_1010_0000_0000_0000_0000_0000_0000
+                        // 0110_0110_1010_1010_0000_0000_0000_0000
+                        // 1111_1111_0110_0110_1010_1010_0000_0000
+                        var sample: UInt32 = 0
                         for i in 0 ..< wavFile.bytesPerSample {
-                            sample <<= 8
-                            sample |= Int(byteBuffer[baseByteArrayIndexOfSample + i])
+                            sample >>= 8
+                            sample |= UInt32(byteBuffer[baseByteArrayIndexOfSample + i]).bigEndian
                         }
 
-                        floatBuffer[framesRead] = Float(Double(sample) * floatFactor)
+                        // Shift the bytes we've assembled so they're now sitting on the right
+                        // 0000_0000_1111_1111_0110_0110_1010_1010
+                        // The const is the number of unfilled bits in our 32bit Int (8 in this example).
+                        sample >>= bitShiftConst
+
+                        // We now have the correct little endian representation in the encoded byte order.
+                        // We need to convert the bits we've collected into a signed Int because that's
+                        // how the wav format is encoded (and simply: we need negative values in the ints
+                        // in order to have them in the resulting floats).
+                        floatBuffer[framesRead] = Float(Double(Int32(bitPattern: sample)) * floatFactor)
                     }
 
                     framesRead += 1
