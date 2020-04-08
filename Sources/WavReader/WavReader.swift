@@ -60,7 +60,7 @@ public struct WavReader: Sequence {
         bytesPerFrame = numChannels * bytesPerSample
 
         guard
-            let indexOfDataSection = bytes.firstOccurence(of: "data", maxSearchBytes: 2048),
+            let indexOfDataSection = bytes.firstOccurence(of: "data", maxSearchBytes: 4096),
             let dataChunk = bytes.withUnsafeBytes({ buffer -> DataChunk? in
                 buffer.baseAddress?.advanced(by: indexOfDataSection).bindMemory(to: DataChunk.self, capacity: 1).pointee
             })
@@ -102,10 +102,10 @@ extension WavReader {
             case .pcm:
                 return getNextPcmBlock()
             case .ieeeFloat:
-                if wavFile.bitsPerSample == 32 {
-                    return getNextFloatBlock()
-                } else {
-                    return getNextDoubleBlock()
+                switch wavFile.bitsPerSample {
+                case 32: return getNextFloatBlock()
+                case 64: return getNextDoubleBlock()
+                default: fatalError("Unsupported float bit depth: \(wavFile.bitsPerSample)")
                 }
             }
         }
@@ -150,7 +150,7 @@ extension WavReader {
             // it's cheaper to do multiplication than division, so divide
             // here once and multiply each sample by this number:
             let maxPossibleValue = pow(2.0, Double(wavFile.bitsPerSample) - 1)
-            let floatFactor = Double(1.0) / Double(maxPossibleValue)
+            let floatFactor = Double(1.0) / maxPossibleValue
             let bitShiftConst = (32 - wavFile.bitsPerSample)
 
             var framesRead = 0
@@ -176,7 +176,7 @@ extension WavReader {
                         // Example for three bytes (24bit PCM):
                         // 1010_1010_0000_0000_0000_0000_0000_0000
                         // 0110_0110_1010_1010_0000_0000_0000_0000
-                        // 1111_1111_0110_0110_1010_1010_0000_0000
+                        // 0111_1111_0110_0110_1010_1010_0000_0000
                         var sample: UInt32 = 0
                         for i in 0 ..< wavFile.bytesPerSample {
                             sample >>= 8
@@ -184,15 +184,18 @@ extension WavReader {
                         }
 
                         // Shift the bytes we've assembled so they're now sitting on the right
-                        // 0000_0000_1111_1111_0110_0110_1010_1010
+                        // For example: 0000_0000_0111_1111_0110_0110_1010_1010 (from example above).
                         // The const is the number of unfilled bits in our 32bit Int (8 in this example).
-                        sample >>= bitShiftConst
+
+                        // We make the Int signed here *before* bit shifting to ensure we carry the sign
+                        // bit correctly (otherwise we can end up with values bigger than `maxPossibleValue`)
+                        // If we started with   1010_1100_0000_0000_0000_0000_0000_0000 (8 bit input)
+                        // our result should be 1111_1111_1111_1111_1111_1111_1010_1100
+                        let sampleAsSignedInt = Int32(bitPattern: sample) >> bitShiftConst
 
                         // We now have the correct little endian representation in the encoded byte order.
-                        // We need to convert the bits we've collected into a signed Int because that's
-                        // how the wav format is encoded (and simply: we need negative values in the ints
-                        // in order to have them in the resulting floats).
-                        floatBuffer[framesRead] = Float(Double(Int32(bitPattern: sample)) * floatFactor)
+                        // Multiplication is faster than division so multiply by our constant factor.
+                        floatBuffer[framesRead] = Float(Double(sampleAsSignedInt) * floatFactor)
                     }
 
                     framesRead += 1

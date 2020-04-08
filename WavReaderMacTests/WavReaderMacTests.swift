@@ -26,10 +26,11 @@ class WavReaderTests: XCTestCase {
         let urls = ["16bit-44100", "16bit-48000", "24bit-44100", "24bit-48000", "32bit-44100", "32bit-48000"].compactMap {
             return testBundle.url(forResource: $0, withExtension: ".wav")
         }
+
         try! urls.forEach { url in
             print(url)
 
-            let blockSize = 16
+            let blockSize = 1024
             let wavReader = try WavReader(bytes: Data(contentsOf: url, options: .alwaysMapped), blockSize: blockSize)
 
 
@@ -39,6 +40,7 @@ class WavReaderTests: XCTestCase {
             try file.read(into: buffer, frameCount: AVAudioFrameCount(blockSize))
 
             let array = Array(UnsafeBufferPointer(start: buffer.floatChannelData![0], count: Int(buffer.frameLength)))
+
             XCTAssertEqual(array, wavReader.makeIterator().next()!)
         }
     }
