@@ -29,7 +29,7 @@ class WavReaderTests: XCTestCase {
         try! urls.forEach { url in
             print(url)
 
-            let blockSize = 16
+            let blockSize = 1024
             let wavReader = try WavReader(bytes: Data(contentsOf: url, options: .alwaysMapped), blockSize: blockSize)
 
 

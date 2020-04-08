@@ -1,5 +1,5 @@
 import XCTest
-@testable import WavFile
+@testable import WavReader
 
 final class WavFileTests: XCTestCase {
     func testExample() {
