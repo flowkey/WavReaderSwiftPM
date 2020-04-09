@@ -34,6 +34,10 @@ class WavReaderTests: XCTestCase {
     func testSingleBlock32Bit48000() throws {
         try runTestOnSingleBlock("32bit-48000")
     }
+
+    func testSingleBlock64Bit44100() throws {
+        try runTestOnSingleBlock("64bit-44100")
+    }
 }
 
 func runTestOnSingleBlock(_ filename: String) throws {

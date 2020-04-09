@@ -19,6 +19,7 @@
 		5CEB6C68242BFB89006883FF /* 32bit-44100.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5CEB6C3B242BF4A0006883FF /* 32bit-44100.wav */; };
 		5CEB6C69242BFB89006883FF /* 32bit-48000.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5CEB6C3C242BF4A0006883FF /* 32bit-48000.wav */; };
 		5CEB6C6A242BFBB2006883FF /* WavReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CE1D54524256159003CEE76 /* WavReader.swift */; };
+		602557CC243F5D6000BDF98B /* 64bit-44100.wav in Resources */ = {isa = PBXBuildFile; fileRef = 602557CB243F5D6000BDF98B /* 64bit-44100.wav */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -63,6 +64,7 @@
 		5CEB6C55242BFB58006883FF /* WavReaderMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WavReaderMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5CEB6C5A242BFB58006883FF /* WavReaderMacTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WavReaderMacTests.swift; sourceTree = "<group>"; };
 		5CEB6C5C242BFB58006883FF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		602557CB243F5D6000BDF98B /* 64bit-44100.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; name = "64bit-44100.wav"; path = "Tests/Wavs/64bit-44100.wav"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -144,6 +146,7 @@
 		5CEB6C59242BFB58006883FF /* WavReaderMacTests */ = {
 			isa = PBXGroup;
 			children = (
+				602557CB243F5D6000BDF98B /* 64bit-44100.wav */,
 				5CEB6C3A242BF4A0006883FF /* 16bit-44100.wav */,
 				5CEB6C38242BF4A0006883FF /* 16bit-48000.wav */,
 				5CEB6C37242BF4A0006883FF /* 24bit-44100.wav */,
@@ -281,6 +284,7 @@
 				5CEB6C65242BFB89006883FF /* 16bit-48000.wav in Resources */,
 				5CEB6C69242BFB89006883FF /* 32bit-48000.wav in Resources */,
 				5CEB6C67242BFB89006883FF /* 24bit-48000.wav in Resources */,
+				602557CC243F5D6000BDF98B /* 64bit-44100.wav in Resources */,
 				5CEB6C64242BFB89006883FF /* 16bit-44100.wav in Resources */,
 				5CEB6C66242BFB89006883FF /* 24bit-44100.wav in Resources */,
 			);
