@@ -185,7 +185,8 @@ extension WavReader {
                 let framesToRead = Swift.min(wavFile.blockSize, (wavFile.numFrames - frameIndex))
                 guard framesToRead > 0 else { return nil }
 
-                floatBuffer = readBuffer[frameIndex ..< frameIndex + (framesToRead * wavFile.numChannels)].map { return Float($0) }
+                let firstSample = frameIndex * wavFile.numChannels
+                floatBuffer = readBuffer[firstSample ..< firstSample + (framesToRead * wavFile.numChannels)].map { return Float($0) }
                 self.frameIndex += framesToRead
                 return floatBuffer
             }
@@ -204,7 +205,8 @@ extension WavReader {
                 let framesToRead = Swift.min(wavFile.blockSize, (wavFile.numFrames - frameIndex))
                 guard framesToRead > 0 else { return nil }
 
-                floatBuffer = readBuffer[frameIndex ..< frameIndex + (framesToRead * wavFile.numChannels)].map { return Float($0) }
+                let firstSample = frameIndex * wavFile.numChannels
+                floatBuffer = readBuffer[firstSample ..< firstSample + (framesToRead * wavFile.numChannels)].map { return Float($0) }
                 self.frameIndex += framesToRead
                 return floatBuffer
             }
@@ -259,7 +261,10 @@ extension WavReader {
 
                         // We now have the correct little endian representation in the encoded byte order.
                         // Multiplication is faster than division so multiply by our constant factor.
-                        floatBuffer[framesRead] = Float(Double(sampleAsSignedInt) * floatFactor)
+                        // A block holds every channel interleaved, so each frame occupies
+                        // `numChannels` slots rather than one.
+                        floatBuffer[(framesRead * wavFile.numChannels) + channel] =
+                            Float(Double(sampleAsSignedInt) * floatFactor)
                     }
 
                     framesRead += 1
@@ -277,8 +282,8 @@ extension WavReader {
 
                     // Empty the rest of the float buffer, otherwise it
                     // will contain the previous frame's data:
-                    (framesRead ..< wavFile.blockSize).forEach { i in
-                        floatBuffer[i] = 0.0
+                    ((framesRead * wavFile.numChannels) ..< floatBuffer.count).forEach { sampleIndex in
+                        floatBuffer[sampleIndex] = 0.0
                     }
 
                     return floatBuffer

@@ -7,13 +7,19 @@ import XCTest
 /// rather than a tolerance — anything less would hide a scaling or endianness mistake, since a
 /// half-scaled or byte-swapped decode still correlates with the original.
 final class AudioFileReaderTests: XCTestCase {
-    /// Fixture pairs: 16- and 24-bit mono, two sample rates. Float WAVs have no FLAC counterpart,
-    /// because FLAC stores integer samples only.
+    /// Fixture pairs: 16- and 24-bit mono at two sample rates, plus one stereo pair. Float WAVs have
+    /// no FLAC counterpart, because FLAC stores integer samples only.
+    ///
+    /// The stereo pair is there because block iteration hands back every channel interleaved, and a
+    /// mono corpus cannot tell a reader that interleaves correctly from one that writes a frame per
+    /// slot. Its two channels carry different audio — the right is the left delayed and attenuated —
+    /// so a reader that dropped or duplicated a channel would disagree rather than coincide.
     private static let fixtureNames = [
         "16bit-44100",
         "16bit-48000",
         "24bit-44100",
         "24bit-48000",
+        "16bit-44100-stereo",
     ]
 
     /// The fixtures sit beside the test sources rather than being declared resources, so they are
@@ -103,6 +109,32 @@ final class AudioFileReaderTests: XCTestCase {
         }
     }
 
+    /// A block is `blockSize` frames of interleaved samples, so a stereo block is twice as long as a
+    /// mono one and its two channels hold different audio. Asserting both here keeps the pair above
+    /// honest: a fixture that had become dual-mono, or a reader that emitted one slot per frame,
+    /// would still satisfy the WAV-against-FLAC comparison if only one of the two were checked.
+    func testStereoBlocksInterleaveBothChannels() throws {
+        let stereoName = "16bit-44100-stereo"
+        let blockSize = 1024
+
+        for reader in [
+            try AudioFileReader(filename: wavPath(stereoName), blockSize: blockSize),
+            try AudioFileReader(filename: flacPath(stereoName), blockSize: blockSize),
+        ] {
+            XCTAssertEqual(reader.numChannels, 2)
+
+            guard let firstBlock = reader.makeIterator().next() else {
+                return XCTFail("\(stereoName): no blocks")
+            }
+            XCTAssertEqual(firstBlock.count, blockSize * 2, "\(stereoName): interleaved block length")
+
+            let left = stride(from: 0, to: firstBlock.count, by: 2).map { firstBlock[$0] }
+            let right = stride(from: 1, to: firstBlock.count, by: 2).map { firstBlock[$0] }
+            XCTAssertNotEqual(left, right, "\(stereoName): the two channels decoded identically")
+            XCTAssertFalse(right.allSatisfy { $0 == 0 }, "\(stereoName): the right channel is silent")
+        }
+    }
+
     // MARK: - Format dispatch
 
     func testAudioFileReaderDispatchesOnTheFileContents() throws {
@@ -180,6 +212,7 @@ final class AudioFileReaderTests: XCTestCase {
         ("testReadSliceAgreesWithTheWavReader", testReadSliceAgreesWithTheWavReader),
         ("testRepeatedReadSlicesAreIdentical", testRepeatedReadSlicesAreIdentical),
         ("testBlockIterationAgreesWithTheWavReader", testBlockIterationAgreesWithTheWavReader),
+        ("testStereoBlocksInterleaveBothChannels", testStereoBlocksInterleaveBothChannels),
         ("testAudioFileReaderDispatchesOnTheFileContents", testAudioFileReaderDispatchesOnTheFileContents),
         ("testAudioFileReaderIgnoresAMisleadingExtension", testAudioFileReaderIgnoresAMisleadingExtension),
         ("testAudioFileReaderRejectsSomethingThatIsNeither", testAudioFileReaderRejectsSomethingThatIsNeither),
