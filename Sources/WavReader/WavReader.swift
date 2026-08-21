@@ -47,10 +47,38 @@ public struct WavReader: Sequence, Sendable {
             throw FormatError.couldNotFindFmtSection
         }
 
-        switch fmtChunk.formatType {
+        // `WAVE_FORMAT_EXTENSIBLE` states the real format in its extension rather than in
+        // `formatType`, so the tag has to be resolved before it can be switched on. Multichannel
+        // recordings are routinely written this way — every WAV in the RWCP impulse-response corpus
+        // is, 16 or 30 channels of ordinary 16-bit PCM — and rejecting the container rejected files
+        // whose samples this reader can already decode.
+        //
+        // The extension's `SubFormat` is a GUID whose first two bytes are the tag a non-extensible
+        // file would have carried, followed by the fixed `KSDATAFORMAT` suffix, so those two bytes
+        // are the whole of it. From the chunk's start: 24 bytes of `FmtChunk`, then `cbSize` (2),
+        // `validBitsPerSample` (2) and `channelMask` (4), which puts the tag at +32. `cbSize` must
+        // cover the 22-byte extension for those bytes to exist at all.
+        let resolvedFormatType: UInt16
+        if fmtChunk.formatType == 0xFFFE {
+            let extensionSizeOffset = indexOfFormatSection + 24
+            let subFormatOffset = indexOfFormatSection + 32
+            guard
+                bytes.count >= subFormatOffset + 2,
+                bytes.withUnsafeBytes({ $0.loadUnaligned(fromByteOffset: extensionSizeOffset, as: UInt16.self) }) >= 22
+            else {
+                throw FormatError.unsupportedFormat(format: Int(fmtChunk.formatType))
+            }
+            resolvedFormatType = bytes.withUnsafeBytes {
+                $0.loadUnaligned(fromByteOffset: subFormatOffset, as: UInt16.self)
+            }
+        } else {
+            resolvedFormatType = fmtChunk.formatType
+        }
+
+        switch resolvedFormatType {
         case 1: self.formatType = .pcm
         case 3: self.formatType = .ieeeFloat
-        default: throw FormatError.unsupportedFormat(format: Int(fmtChunk.formatType))
+        default: throw FormatError.unsupportedFormat(format: Int(resolvedFormatType))
         }
 
         sampleRate = Int(fmtChunk.sampleRate)
