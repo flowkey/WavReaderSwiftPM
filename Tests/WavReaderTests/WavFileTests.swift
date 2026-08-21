@@ -1,5 +1,5 @@
 import XCTest
-@testable import WavFile
+@testable import WavReader
 
 final class WavFileTests: XCTestCase {
     func testExample() {
@@ -9,7 +9,7 @@ final class WavFileTests: XCTestCase {
         XCTAssertEqual(true, true)
     }
 
-    static var allTests = [
+    static let allTests = [
         ("testExample", testExample),
     ]
 }

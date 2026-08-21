@@ -9,7 +9,7 @@
 import Foundation
 import CWavHeader
 
-public struct WavReader: Sequence {
+public struct WavReader: Sequence, Sendable {
     public let formatType: Format
     public let sampleRate: Int
     public let numFrames: Int
@@ -30,7 +30,7 @@ public struct WavReader: Sequence {
         case unsupportedFormat(format: Int)
     }
 
-    public enum Format {
+    public enum Format: Sendable {
         case pcm
         case ieeeFloat
     }
@@ -47,10 +47,38 @@ public struct WavReader: Sequence {
             throw FormatError.couldNotFindFmtSection
         }
 
-        switch fmtChunk.formatType {
+        // `WAVE_FORMAT_EXTENSIBLE` states the real format in its extension rather than in
+        // `formatType`, so the tag has to be resolved before it can be switched on. Multichannel
+        // recordings are routinely written this way — every WAV in the RWCP impulse-response corpus
+        // is, 16 or 30 channels of ordinary 16-bit PCM — and rejecting the container rejected files
+        // whose samples this reader can already decode.
+        //
+        // The extension's `SubFormat` is a GUID whose first two bytes are the tag a non-extensible
+        // file would have carried, followed by the fixed `KSDATAFORMAT` suffix, so those two bytes
+        // are the whole of it. From the chunk's start: 24 bytes of `FmtChunk`, then `cbSize` (2),
+        // `validBitsPerSample` (2) and `channelMask` (4), which puts the tag at +32. `cbSize` must
+        // cover the 22-byte extension for those bytes to exist at all.
+        let resolvedFormatType: UInt16
+        if fmtChunk.formatType == 0xFFFE {
+            let extensionSizeOffset = indexOfFormatSection + 24
+            let subFormatOffset = indexOfFormatSection + 32
+            guard
+                bytes.count >= subFormatOffset + 2,
+                bytes.withUnsafeBytes({ $0.loadUnaligned(fromByteOffset: extensionSizeOffset, as: UInt16.self) }) >= 22
+            else {
+                throw FormatError.unsupportedFormat(format: Int(fmtChunk.formatType))
+            }
+            resolvedFormatType = bytes.withUnsafeBytes {
+                $0.loadUnaligned(fromByteOffset: subFormatOffset, as: UInt16.self)
+            }
+        } else {
+            resolvedFormatType = fmtChunk.formatType
+        }
+
+        switch resolvedFormatType {
         case 1: self.formatType = .pcm
         case 3: self.formatType = .ieeeFloat
-        default: throw FormatError.unsupportedFormat(format: Int(fmtChunk.formatType))
+        default: throw FormatError.unsupportedFormat(format: Int(resolvedFormatType))
         }
 
         sampleRate = Int(fmtChunk.sampleRate)
@@ -78,6 +106,70 @@ public struct WavReader: Sequence {
     public init(filename: String = "example.wav", blockSize: Int = 1024) throws {
         let wavData = try Data(contentsOf: URL(fileURLWithPath: filename), options: [.mappedIfSafe])
         try self.init(bytes: wavData, blockSize: blockSize)
+    }
+
+    /// Reads a slice of mono audio samples (first channel) normalized to [-1, 1].
+    ///
+    /// Handles negative `beginMilliseconds` (zero-pads start) and `endMilliseconds`
+    /// past EOF (zero-pads end). Supports 16-bit, 24-bit PCM and 32-bit float.
+    ///
+    /// - Parameters:
+    ///   - beginMilliseconds: Start time in milliseconds (can be negative for zero-padding).
+    ///   - endMilliseconds: End time in milliseconds (can extend past file duration).
+    /// - Returns: Mono `[Float]` samples normalized to [-1, 1].
+    public func readSlice(beginMilliseconds: Int, endMilliseconds: Int) -> [Float] {
+        let beginSample = beginMilliseconds * sampleRate / 1000
+        let endSample = endMilliseconds * sampleRate / 1000
+        let duration = endSample - beginSample
+
+        var result = [Float](repeating: 0, count: duration)
+
+        let totalFrames = numFrames
+        let srcStart = Swift.max(beginSample, 0)
+        let srcEnd = Swift.min(endSample, totalFrames)
+        let dstStart = Swift.max(-beginSample, 0)
+
+        guard srcStart < srcEnd else { return result }
+
+        let count = srcEnd - srcStart
+
+        bytes.withUnsafeBytes { rawBuffer in
+            let byteBuffer = rawBuffer.bindMemory(to: UInt8.self)
+
+            switch (formatType, bytesPerSample) {
+            case (.pcm, 2):
+                for i in 0..<count {
+                    let byteOff = offsetToWavData + (srcStart + i) * bytesPerFrame
+                    let lo = UInt16(byteBuffer[byteOff])
+                    let hi = UInt16(byteBuffer[byteOff + 1])
+                    let raw = Int16(bitPattern: lo | (hi << 8))
+                    result[dstStart + i] = Float(raw) / 32768.0
+                }
+            case (.pcm, 3):
+                for i in 0..<count {
+                    let byteOff = offsetToWavData + (srcStart + i) * bytesPerFrame
+                    let b0 = Int32(byteBuffer[byteOff])
+                    let b1 = Int32(byteBuffer[byteOff + 1])
+                    let b2 = Int32(Int8(bitPattern: byteBuffer[byteOff + 2]))
+                    let sample = (b2 << 16) | (b1 << 8) | b0
+                    result[dstStart + i] = Float(sample) / 8388608.0
+                }
+            case (.ieeeFloat, 4):
+                for i in 0..<count {
+                    let byteOff = offsetToWavData + (srcStart + i) * bytesPerFrame
+                    let bits = UInt32(byteBuffer[byteOff]) |
+                               (UInt32(byteBuffer[byteOff + 1]) << 8) |
+                               (UInt32(byteBuffer[byteOff + 2]) << 16) |
+                               (UInt32(byteBuffer[byteOff + 3]) << 24)
+                    result[dstStart + i] = Float(bitPattern: bits)
+                }
+            default:
+                // Unsupported format — return zeros
+                break
+            }
+        }
+
+        return result
     }
 
     public func makeIterator() -> WavReader.Iterator {
@@ -121,7 +213,8 @@ extension WavReader {
                 let framesToRead = Swift.min(wavFile.blockSize, (wavFile.numFrames - frameIndex))
                 guard framesToRead > 0 else { return nil }
 
-                floatBuffer = readBuffer[frameIndex ..< frameIndex + (framesToRead * wavFile.numChannels)].map { return Float($0) }
+                let firstSample = frameIndex * wavFile.numChannels
+                floatBuffer = readBuffer[firstSample ..< firstSample + (framesToRead * wavFile.numChannels)].map { return Float($0) }
                 self.frameIndex += framesToRead
                 return floatBuffer
             }
@@ -140,7 +233,8 @@ extension WavReader {
                 let framesToRead = Swift.min(wavFile.blockSize, (wavFile.numFrames - frameIndex))
                 guard framesToRead > 0 else { return nil }
 
-                floatBuffer = readBuffer[frameIndex ..< frameIndex + (framesToRead * wavFile.numChannels)].map { return Float($0) }
+                let firstSample = frameIndex * wavFile.numChannels
+                floatBuffer = readBuffer[firstSample ..< firstSample + (framesToRead * wavFile.numChannels)].map { return Float($0) }
                 self.frameIndex += framesToRead
                 return floatBuffer
             }
@@ -195,7 +289,10 @@ extension WavReader {
 
                         // We now have the correct little endian representation in the encoded byte order.
                         // Multiplication is faster than division so multiply by our constant factor.
-                        floatBuffer[framesRead] = Float(Double(sampleAsSignedInt) * floatFactor)
+                        // A block holds every channel interleaved, so each frame occupies
+                        // `numChannels` slots rather than one.
+                        floatBuffer[(framesRead * wavFile.numChannels) + channel] =
+                            Float(Double(sampleAsSignedInt) * floatFactor)
                     }
 
                     framesRead += 1
@@ -213,8 +310,8 @@ extension WavReader {
 
                     // Empty the rest of the float buffer, otherwise it
                     // will contain the previous frame's data:
-                    (framesRead ..< wavFile.blockSize).forEach { i in
-                        floatBuffer[i] = 0.0
+                    ((framesRead * wavFile.numChannels) ..< floatBuffer.count).forEach { sampleIndex in
+                        floatBuffer[sampleIndex] = 0.0
                     }
 
                     return floatBuffer

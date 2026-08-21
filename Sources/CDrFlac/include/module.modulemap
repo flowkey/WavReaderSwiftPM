@@ -1,0 +1,4 @@
+module CDrFlac {
+    header "dr_flac.h"
+    export *
+}
